@@ -1,6 +1,6 @@
 <?php
 /*
- * This file is part of the Distribution package.
+ * This file is part of the FormManagerAPIClient project
  *
  * Copyright (c) 2015-2017 LIN3S <info@lin3s.com>
  *
