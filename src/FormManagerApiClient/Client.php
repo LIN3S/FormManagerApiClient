@@ -21,6 +21,8 @@ class Client
     private $uri;
     private $username;
     private $password;
+    private $token;
+    private $tokenRenewTries;
 
     public function __construct(GuzzleClient $client, string $uri, string $username, string $password)
     {
@@ -28,13 +30,18 @@ class Client
         $this->uri = $uri;
         $this->username = $username;
         $this->password = $password;
+        $this->token = null;
+        $this->tokenRenewTries = 0;
+
+        $this->generateAuthenticationToken();
     }
 
     public function postFormRecord(string $formSlug, array $fields) : array
     {
         $config = [
-            'form_params' => $fields
+            'form_params' => $fields,
         ];
+        $config = array_merge($config, $this->authToken());
 
         return $this->post('/api/forms/' . $formSlug . '/records', $config);
     }
@@ -55,6 +62,12 @@ class Client
             $config = array_merge($config, $this->auth());
             $response = $this->client->post($this->uri . $endPoint, $config);
         } catch (TransferException $exception) {
+            if ($exception->getCode() === '401') {
+                $this->renewAuthenticationToken();
+
+                return $this->post($endPoint, $config);
+            }
+
             $response = $exception->getResponse();
         }
 
@@ -64,19 +77,61 @@ class Client
     private function get(string $endPoint) : array
     {
         try {
-            $response = $this->client->get($this->uri . $endPoint, $this->auth());
+            $response = $this->client->get($this->uri . $endPoint, $this->authToken());
         } catch (TransferException $exception) {
+            if ($exception->getCode() === '401') {
+                $this->renewAuthenticationToken();
+
+                return $this->get($endPoint);
+            }
+
             $response = $exception->getResponse();
         }
 
         return json_decode($response->getBody()->getContents(), true);
     }
 
+    private function generateAuthenticationToken() : void
+    {
+        $response = $this->post('/api/login_check', [
+            'json' => [
+                'username' => $this->username,
+                'password' => $this->password,
+            ],
+        ]);
+
+        if (!array_key_exists('token', $response)) {
+            throw new \Exception('Bad credentials');
+        }
+
+        $this->token = $response['token'];
+        $this->tokenRenewTries = 0;
+    }
+
+    private function renewAuthenticationToken() : void
+    {
+        $this->tokenRenewTries++;
+        if ($this->tokenRenewTries === 2) {
+            throw new \Exception('Authentication token cannot be renew, check that the credentials are valid');
+        }
+
+        $this->generateAuthenticationToken();
+    }
+
     private function auth() : array
     {
         return ['auth' => [
             $this->username,
-            $this->password
+            $this->password,
         ]];
+    }
+
+    private function authToken() : array
+    {
+        return [
+            'headers' => [
+                'Authorization' => sprintf('Bearer %s', $this->token),
+            ],
+        ];
     }
 }
