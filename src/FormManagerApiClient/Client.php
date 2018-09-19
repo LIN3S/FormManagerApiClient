@@ -41,7 +41,6 @@ class Client
         $config = [
             'form_params' => $fields,
         ];
-        $config = array_merge($config, $this->authToken());
 
         return $this->post('/api/forms/' . $formSlug . '/records', $config);
     }
@@ -58,8 +57,8 @@ class Client
 
     private function post(string $endPoint, array $config) : array
     {
+        $config = array_merge($config, $this->authToken());
         try {
-            $config = array_merge($config, $this->auth());
             $response = $this->client->post($this->uri . $endPoint, $config);
         } catch (TransferException $exception) {
             if ($exception->getCode() === '401') {
@@ -116,14 +115,6 @@ class Client
         }
 
         $this->generateAuthenticationToken();
-    }
-
-    private function auth() : array
-    {
-        return ['auth' => [
-            $this->username,
-            $this->password,
-        ]];
     }
 
     private function authToken() : array
