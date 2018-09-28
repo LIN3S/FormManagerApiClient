@@ -49,6 +49,11 @@ class Client
         return $this->get('/api/forms/' . $formSlug . '/records/' . $formRecordId);
     }
 
+    public function getFormRecords(string $formSlug) : array
+    {
+        return $this->get('/api/forms/' . $formSlug . '/records');
+    }
+
     private function post(string $endPoint, array $config) : array
     {
         try {
